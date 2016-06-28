@@ -19,6 +19,7 @@
 #include <linux/gpio.h>
 #include <linux/delay.h>
 #include <linux/pwm_backlight.h>
+#include <linux/mtd/partitions.h>
 
 #include <asm/hardware/vic.h>
 #include <asm/mach/arch.h>
@@ -47,6 +48,7 @@
 #include <plat/backlight.h>
 #include <plat/regs-fb-v4.h>
 #include <plat/mfc.h>
+#include <plat/nand.h>
 
 #include "common.h"
 
@@ -210,6 +212,51 @@ static struct s3c_fb_platdata smdkv210_lcd0_pdata __initdata = {
 	.setup_gpio	= s5pv210_fb_gpio_setup_24bpp,
 };
 
+// NAND
+static struct mtd_partition smdkv210_default_nand_part[] __initdata = {
+	[0] = {
+		.name	= "u-boot",
+		.size		= SZ_256K,
+		.offset	= 0,
+	},
+	[1] = {
+		.name	= "u-boot-env",
+		.size		= SZ_128K,
+		.offset	= MTDPART_OFS_APPEND,
+	},
+	[2] = {
+		.name	= "kernel",
+		/* 5 megabytes, for a kernel with no modules
+		 * or a uImage with a ramdisk attached */
+		.size		= 0x00500000,
+		.offset	= MTDPART_OFS_APPEND,
+	},
+	[3] = {
+		.name	= "root",
+		.offset	= MTDPART_OFS_APPEND,
+		.size		= MTDPART_SIZ_FULL,
+	},
+};
+
+static struct s3c2410_nand_set smdkv210_nand_sets[] __initdata = {
+	[0] = {
+		.name		= "nand",
+		.nr_chips		= 1,
+		.nr_partitions	= ARRAY_SIZE(smdkv210_default_nand_part),
+		.partitions	= smdkv210_default_nand_part,
+		.flash_bbt 	= 1, /* we use u-boot to create a BBT */
+	},
+};
+
+static struct s3c2410_platform_nand smdkv210_nand_info __initdata = {
+	.tacls		= 0,
+	.twrph0		= 25,
+	.twrph1		= 15,
+	.nr_sets		= ARRAY_SIZE(smdkv210_nand_sets),
+	.sets		= smdkv210_nand_sets,
+	.ignore_unset_ecc = 1,
+};
+
 static struct platform_device *smdkv210_devices[] __initdata = {
 	&s3c_device_adc,
 	&s3c_device_cfcon,
@@ -240,6 +287,7 @@ static struct platform_device *smdkv210_devices[] __initdata = {
 	&samsung_device_keypad,
 	&smdkv210_dm9000,
 	&smdkv210_lcd_lte480wv,
+	&s3c_device_nand,
 };
 
 static void __init smdkv210_dm9000_init(void)
@@ -322,6 +370,8 @@ static void __init smdkv210_machine_init(void)
 	samsung_bl_set(&smdkv210_bl_gpio_info, &smdkv210_bl_data);
 
 	platform_add_devices(smdkv210_devices, ARRAY_SIZE(smdkv210_devices));
+
+	s3c_nand_set_platdata(&smdkv210_nand_info);
 }
 
 MACHINE_START(SMDKV210, "SMDKV210")
